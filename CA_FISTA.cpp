@@ -327,8 +327,10 @@ void cabcd(	            int *rowidx,
 	 	//Adding these lines for FISTA
 	 	// v=xk_1+(k-2)/(k+1)(xk_1-xk_2);
 	 	// v is stored in w again
-	 	daxpy(&n,  (iter-2)/(iter+1), w, &incx, w, &incx); 
-	 	daxpy(&n, -(iter-2)/(iter+1), wpre, &incx, w, &incx); 	
+	 	double al1=(iter-2)/(iter+1);
+	 	double al2=-(iter-2)/(iter+1);
+	 	daxpy(&n, &al1 , w, &incx, w, &incx); 
+	 	daxpy(&n, &al2, wpre, &incx, w, &incx); 	
 
 
 	 	daxpy(&n, &tk, recvG + s*n*n, &incx, w, &incx);
