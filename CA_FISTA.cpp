@@ -196,7 +196,7 @@ void cabcd(	            int *rowidx,
 	memset(wpre, 0, sizeof(double)*n);
 
 	char transa = 'N', transb = 'T', uplo = 'U';
-	double alp = 1.0/m;
+	double alp = 1.0/std::floor(percent*m);
 	double one = 1., zero = 0., neg = -1.;
 	int one_i=1;
 	double neg_lambda = -lambda;
@@ -230,6 +230,7 @@ void cabcd(	            int *rowidx,
 	//vector<int> samprowidx(b+1, 1);
 	vector<int> sampcolidx;
 	vector<double> sampvals;
+	vector<double> sampy;
 	int cidx = 0, rnnz = 0;
 	double tval = 0.;
 	
@@ -261,6 +262,7 @@ void cabcd(	            int *rowidx,
 			//samprowidx[0]=1;
 			for(int k = 0; k < b; ++k){
 					samprowidx[k+1]=samprowidx[k]+rowidx[index[k]+1]-rowidx[index[k]];
+					sampy.push_back(y[index[k]]);
 					for(int j =rowidx[index[k]]-1; j < rowidx[index[k]+1]-1; ++j){
 						cidx = colidx[j];
 						tval = vals[j];
@@ -286,6 +288,8 @@ void cabcd(	            int *rowidx,
 
 			sampvals.clear();
 			sampcolidx.clear();
+			samprowidx.clear();
+			sampy.clear();
 			
 
 
@@ -828,11 +832,11 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 	}*/
 
 	s = 1;
-	//b = 2000;
+	b=0.1;
 	for(int k = 0; k < 1; ++k){
 		if(b > 1)
 			continue;
-		for(int j = 0; j < 5; ++j){
+		for(int j = 0; j < 6; ++j){
 
 	
 			if(rank == 0){
