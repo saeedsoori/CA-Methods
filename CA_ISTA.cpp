@@ -154,6 +154,10 @@ void cabcd(	            int *rowidx,
 //MPI_Barrier(comm);
 	int b=std::floor(percent*mlocal);
 	int len=b;
+	if(rank==0){
+			cout<<"b is: "<<b<<endl;
+			cout<<"len is: "<<len<<endl;
+	}
 	double *alpha, *res,  *obj_err, *sol_err;
 	double *del_w;
 	double ctol;
@@ -192,7 +196,7 @@ void cabcd(	            int *rowidx,
 	memset(w, 0, sizeof(double)*n);
 
 	char transa = 'N', transb = 'T', uplo = 'U';
-	double alp = 1.0/m;
+	double alp = 1.0/std::floor(percent*m);
 	double one = 1., zero = 0., neg = -1.;
 	int one_i=1;
 	double neg_lambda = -lambda;
@@ -226,6 +230,7 @@ void cabcd(	            int *rowidx,
 	//vector<int> samprowidx(b+1, 1);
 	vector<int> sampcolidx;
 	vector<double> sampvals;
+	vector<double> sampy;
 	int cidx = 0, rnnz = 0;
 	double tval = 0.;
 	
@@ -251,17 +256,19 @@ void cabcd(	            int *rowidx,
 					++count; ++cursamp;
 				}
 			}
-		
+			
 	
 	// Choosing b rows of the data matrix
 			//samprowidx[0]=1;
 			for(int k = 0; k < b; ++k){
 					samprowidx[k+1]=samprowidx[k]+rowidx[index[k]+1]-rowidx[index[k]];
+					sampy.push_back(y[index[k]]);
 					for(int j =rowidx[index[k]]-1; j < rowidx[index[k]+1]-1; ++j){
 						cidx = colidx[j];
 						tval = vals[j];
 						sampcolidx.push_back(cidx);
 						sampvals.push_back(tval);
+
 					}
 
 			}
@@ -278,10 +285,13 @@ void cabcd(	            int *rowidx,
 			// result is stored in part of G
 			// beta is zero here
 			// Therefore in following  line it's computing: X*y which is part of the gradient{G and R in our formulation}
-			mkl_dcsrmv(&transb, &len, &gram_size, &alp, matdesc, &sampvals[0], &sampcolidx[0], &samprowidx[0], &samprowidx[1], &y[0], &zero, G+(s*n*n)+i*n);
+			mkl_dcsrmv(&transb, &len, &gram_size, &alp, matdesc, &sampvals[0], &sampcolidx[0], &samprowidx[0], &samprowidx[1], &sampy[0], &zero, G+(s*n*n)+i*n);
 
+			//dscal(&ngramtemp2, &alp, G+(s*n*n)+i*n, &incx);
 			sampvals.clear();
 			sampcolidx.clear();
+			samprowidx.clear();
+			sampy.clear();
 			
 
 
@@ -295,7 +305,7 @@ void cabcd(	            int *rowidx,
 	 			rr=0;
 
 	 	}*/
-	
+
 	 	gramstp = MPI_Wtime();
 		gramagg += gramstp - gramst;
 		// Reduce and Broadcast: Sum partial Gram and partial residual components.
@@ -304,7 +314,7 @@ void cabcd(	            int *rowidx,
 	 	commstp = MPI_Wtime();
 	 	commagg += commstp - commst;
 	 	innerst = MPI_Wtime();
-
+	 	
 		// We don't need the lambda here since it is L1 norm and non-differentiable
 		//for(int i =0; i < s*n; ++i)
 		//		recvG[i + i*s*n] += lambda;
@@ -314,14 +324,16 @@ void cabcd(	            int *rowidx,
 		 * Perfomed redundantly on all processors
 		*/
 		// X'X*w-X*y or gradient is stored in recvG + s*n*(n+1)
-
+		
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
                 n, 1, n, 1, recvG, n, w, 1, -1, recvG + s*n*n, 1);
+	 
 	//A 	printf("this is the hessian: %d\n",iter);
 	//A 		printme(recvG ,n*n);
 	//A 	printf("Gradient at iter: %d\n",iter);
 	//A 	printme(recvG + s*n*(s*n+1), n);
 	 	daxpy(&n, &tk, recvG + s*n*n, &incx, w, &incx);
+	 	
 		// do proximal:
 	 	double thresh=-lambda*tk;
 	 	for (int i = 0; i < n; ++i)
@@ -333,6 +345,9 @@ void cabcd(	            int *rowidx,
 	 	else
 	 		w[i]=0;
 	}
+	
+
+
 	if(iter%freq==0){
 		for (int z = 0; z < n; ++z)
 		{
@@ -340,6 +355,7 @@ void cabcd(	            int *rowidx,
 		}
 		daxpy(&n, &neg, wop, &incx, wsamp, &incx);
 		resnrm=dnrm2(&n, wsamp, &incx)/dnrm2(&n, wop, &incx);
+		//cout<<resnrm<<endl;
 		if(resnrm <= tol){
 					free(alpha); free(G); free(recvG);
 					free(index); free(del_w); free(wsamp); free(sampres);
@@ -425,6 +441,7 @@ void cabcd(	            int *rowidx,
 		}
 		daxpy(&n, &neg, wop, &incx, wsamp, &incx);
 		resnrm=dnrm2(&n, wsamp, &incx)/dnrm2(&n, wop, &incx);
+		//cout<<resnrm<<endl;
 		if(resnrm <= tol){
 					free(alpha); free(G); free(recvG);
 					free(index); free(del_w); free(wsamp); free(sampres);
@@ -553,7 +570,6 @@ void cabcd(	            int *rowidx,
 		/* Reset some buffers and start next outer iteration */
 
 		//sampcolidx.clear(); 
-		sampvals.clear(); //sampres.clear();
 		//samprowidx[0] = 1;
 		//memset(G, 0, sizeof(double)*gram_size*(gram_size+2));
 		memset(G, 0, sizeof(double)*s*n*(n+1));
@@ -802,7 +818,7 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 	for(int k = 0; k < 1; ++k){
 		if(b > 1)
 			continue;
-		for(int j = 0; j < 5; ++j){
+		for(int j = 0; j < 1; ++j){
 
 	
 			if(rank == 0){
