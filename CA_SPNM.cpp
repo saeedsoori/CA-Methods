@@ -288,7 +288,7 @@ void cabcd(	            int *rowidx,
 			// result is stored in part of G
 			// beta is zero here
 			// Therefore in following  line it's computing: X*y which is part of the gradient{G and R in our formulation}
-			mkl_dcsrmv(&transb, &len, &gram_size, &alp, matdesc, &sampvals[0], &sampcolidx[0], &samprowidx[0], &samprowidx[1], &y[0], &zero, G+(s*n*n)+i*n);
+			mkl_dcsrmv(&transb, &len, &gram_size, &alp, matdesc, &sampvals[0], &sampcolidx[0], &samprowidx[0], &samprowidx[1], &sampy[0], &zero, G+(s*n*n)+i*n);
 
 			sampvals.clear();
 			sampcolidx.clear();
