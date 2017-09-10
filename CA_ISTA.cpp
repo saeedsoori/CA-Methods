@@ -814,11 +814,11 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 	}*/
 
 	s = 1;
-	//b = 2000;
-	for(int k = 0; k < 1; ++k){
+	b=0.1;
+	for(int k = 0; k < 4; ++k){
 		if(b > 1)
 			continue;
-		for(int j = 0; j < 1; ++j){
+		for(int j = 0; j < 6; ++j){
 
 	
 			if(rank == 0){
