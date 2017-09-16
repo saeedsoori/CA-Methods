@@ -144,7 +144,8 @@ void cabcd(	            int *rowidx,
 						int freq,
 						double *w,
 						MPI_Comm comm,
-						double *wop)
+						double *wop,
+						double tkp)
 {
 	int npes, rank;
 	MPI_Comm_size(comm, &npes);
@@ -203,7 +204,7 @@ void cabcd(	            int *rowidx,
 	double neg_alp = -alp;
 	double resnrm = 1.;
 	int info, nrhs = 1;
-	double tk=-0.1;
+	double tk=-tkp;
 
 	///////
 	////
@@ -619,7 +620,7 @@ int main (int argc, char* argv[])
 		if(rank == 0)
 		{
 			std::cout << "Bad args list!" << std::endl;
-			std::cout << argv[0] << " [filename] [rows] [cols] [lambda] [maxit] [tol] [seed] [freq] [block size] [loop block size] [number of benchmark iterations] [nnz] [frequency of residual computation] [wop file] " << std::endl;
+			std::cout << argv[0] << " [filename] [rows] [cols] [lambda] [maxit] [tol] [seed] [freq] [block size] [loop block size] [number of benchmark iterations] [nnz] [frequency of residual computation] [wop file] [tk]" << std::endl;
 		}
 
 		MPI_Finalize();
@@ -640,6 +641,7 @@ int main (int argc, char* argv[])
 	int niter = atoi(argv[11]);
 	int nnz=atoi(argv[12]);
 	fnamewop = argv[14];
+	double tk = atof(argv[15]);
 	//std::string lines = libsvmread(fname, m, n);
 
 	//vector<int> rowidx, colidx;
@@ -846,7 +848,7 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 			//cabcd(rowidx, colidx, vals, m, n, y, y.size(), lambda, s, b, maxit, tol, seed, freq, w, comm);
 			algst = MPI_Wtime();
 			for(int i = 0; i < niter; ++i){
-				cabcd(local_rowidx, local_colidx, local_val, m, n, local_y,y_counts[rank],lambda, s, b, maxit, tol, seed, freq, w, comm,wop);
+				cabcd(local_rowidx, local_colidx, local_val, m, n, local_y,y_counts[rank],lambda, s, b, maxit, tol, seed, freq, w, comm,wop,tk);
 				//write_to_file(w, n);
 				//cabcd(rowidx, colidx, vals, m, n, y, y.size(), lambda, s, b, maxit, tol, seed, freq, w, comm);
 				//cabcd(rowidx, colidx, vals, m, n, y, m, lambda, s, b, maxit, tol, seed, freq, w, comm);
