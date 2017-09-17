@@ -815,7 +815,7 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 
 	s = 1;
 	b=0.1;
-	int Kmax=2;
+	int Kmax=3;
 	int Jmax=6;
 	double *results;
 	results=(double *)malloc(Kmax*Jmax*sizeof(double));
@@ -867,7 +867,8 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 		s = 1;
 		b *= 2;
 	}
-	for (int k = 0; k < Kmax; ++k)
+	if(rank==0){
+		for (int k = 0; k < Kmax; ++k)
 	{
 		for (int j = 0; j < Jmax; ++j)
 		{
@@ -875,6 +876,8 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 		}
 		cout<<endl;
 	}
+	}
+	
 	//myfile.close();
 
 	/*if(rank == 0){
