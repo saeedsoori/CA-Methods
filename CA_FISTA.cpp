@@ -835,10 +835,14 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 
 	s = 1;
 	b=0.1;
-	for(int k = 0; k < 4; ++k){
+	int Kmax=3;
+	int Jmax=6;
+	double *results;
+	results=(double *)malloc(Kmax*Jmax*sizeof(double));
+	for(int k = 0; k < Kmax; ++k){
 		if(b > 1)
 			continue;
-		for(int j = 0; j < 6; ++j){
+		for(int j = 0; j < Jmax; ++j){
 
 	
 			if(rank == 0){
@@ -871,6 +875,7 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 			if(rank == 0){
 	//			cout<<"H6"<<endl;
 				cout << endl << "Total CA-BCD time: " << algmax<< " ms" << endl;
+				results[k*Jmax+j]=algmax;
 				//std::cout << "w = ";
 							//for(int i = 0; i < n; ++i)
 				//	std::cout << std::setprecision(16) << std::fixed << w[i] << " ";
@@ -881,6 +886,16 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 	}
 		s = 1;
 		b *= 2;
+	}
+	if(rank==0){
+		for (int k = 0; k < Kmax; ++k)
+	{
+		for (int j = 0; j < Jmax; ++j)
+		{
+			cout<<results[k*Jmax+j]<<" ";
+		}
+		cout<<endl;
+	}
 	}
 	//myfile.close();
 
