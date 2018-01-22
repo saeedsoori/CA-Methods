@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <cstring>
 #include <string.h>
+#include <math.h>
 #include <iomanip>
 #include <vector>
 #include <cmath>
@@ -145,7 +146,8 @@ void cabcd(	            int *rowidx,
 						double *w,
 						MPI_Comm comm,
 						double *wop,
-						double tkp)
+						double tkp,
+						int Qinput)
 {
 	int npes, rank;
 	MPI_Comm_size(comm, &npes);
@@ -157,7 +159,7 @@ void cabcd(	            int *rowidx,
 	int len=b;
 	double *alpha, *res,  *obj_err, *sol_err;
 	double *del_w;
-	double *wpre,*zvec;
+	double *wpre,*vec_tmp;
 	double ctol;
 	double *G, *recvG, *Xsamp, *wsamp, *sampres, *sampres_sum;
 	int incx = 1;
@@ -166,14 +168,17 @@ void cabcd(	            int *rowidx,
 	int gram_size = n;
 	int ngram = s*n*n;
 	double wnorm=0;
-	double inner_tol=0.01;
+	int Q=Qinput;
+	double inner_tol=0.1;
+	alpha = (double*) malloc (len*sizeof(double));
+	G     = (double*) malloc (s*n*(n+1)*sizeof(double));
 	alpha = (double*) malloc (len*sizeof(double));
 	G     = (double*) malloc (s*n*(n+1)*sizeof(double));
 	recvG = (double*) malloc (s*n*(n+1)*sizeof(double));
 	del_w = (double*) malloc (s*n*sizeof(double));
 	wsamp = (double*) malloc (n*sizeof(double));
 	wpre  = (double*) malloc (n*sizeof(double));
-	zvec  = (double*) malloc (n*sizeof(double));
+	vec_tmp  = (double*) malloc (n*sizeof(double));
 	index = (int*) malloc (b*sizeof(int));
 	sampres = (double*) malloc (n*sizeof(double));
 	sampres_sum = (double*) malloc (n*sizeof(double));
@@ -197,7 +202,7 @@ void cabcd(	            int *rowidx,
 	memset(alpha, 0, sizeof(double)*len);
 	memset(w, 0, sizeof(double)*n);
 	memset(wpre, 0, sizeof(double)*n);
-	memset(zvec, 0, sizeof(double)*n);
+	memset(vec_tmp, 0, sizeof(double)*n);
 
 	char transa = 'N', transb = 'T', uplo = 'U';
 	double alp = 1.0/std::floor(percent*m);
@@ -205,10 +210,11 @@ void cabcd(	            int *rowidx,
 	int one_i=1;
 	double neg_lambda = -lambda;
 	double neg_alp = -alp;
+	double neg_tk=-tkp;
 	double resnrm = 1.;
 	int info, nrhs = 1;
-	double tk=-tkp;
-	double thresh=-lambda*tk;
+	double thresh=lambda*tkp;
+	double gama_p = 1.0, gama_n = 1.0;
 
 	///////
 	////
@@ -285,8 +291,6 @@ void cabcd(	            int *rowidx,
 
 			// Computing alpha*A^T*x+beta*y where 
 			// A is b*(s*n) matrix of sampled data[stored in samplval, sampcolidx and samprowidx]
-			// x is "labels" which is X'*w in the cabcd paper and is zero here for the first iteration
-			// result is stored in part of G
 			// beta is zero here
 			// Therefore in following  line it's computing: X*y which is part of the gradient{G and R in our formulation}
 			mkl_dcsrmv(&transb, &len, &gram_size, &alp, matdesc, &sampvals[0], &sampcolidx[0], &samprowidx[0], &samprowidx[1], &sampy[0], &zero, G+(s*n*n)+i*n);
@@ -327,16 +331,27 @@ void cabcd(	            int *rowidx,
 		 * Perfomed redundantly on all processors
 		*/
 		// X'X*w-X*y or gradient is stored in recvG + s*n*(n+1)
-	 	while(1){
+	 	for(int in=0;in<Q;in++){
 	 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-                n, 1, n, 1, recvG, n, w, 1, 0, zvec, 1);
-	 		daxpy(&n, &neg, recvG + s*n*n, &incx, zvec, &incx);
-	 		for (int i = 0; i < n; ++i)
+                n, 1, n, 1, recvG, n, w, 1, 0, vec_tmp, 1);
+	 		daxpy(&n, &neg, recvG + s*n*n, &incx, vec_tmp, &incx);
+
+			memset(vec, 0, sizeof(double)*n);
+	 		gama_n=(1+sqrt(gama_p*gama_p))/2.0;
+
+	 		double al1 = (gama_p-1.0)/gama_n;
+	 		double al2 = -(gama_p-1.0)/gama_n;
+
+	 		daxpy(&n, &al1 , w, &incx, vec, &incx);
+	 		daxpy(&n, &one , w, &incx, vec, &incx);  
+	 		daxpy(&n, &al2, wpre, &incx, vec, &incx); 	
+	 		for (int z = 0; z < n; ++z)
 			{
-				wpre[i]=w[i];
+				wpre[z]=w[z];
+				w[z]=vec[z];
 			}
 
-	 		daxpy(&n, &tk, zvec, &incx, w, &incx);
+	 		daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
 			// do proximal:
 	 		for (int i = 0; i < n; ++i)
@@ -350,10 +365,10 @@ void cabcd(	            int *rowidx,
 			}
 
 			// if(norm(wpre-w)<tol) break;
-			daxpy(&n, &neg, w, &incx, wpre, &incx);
-			wnorm=dnrm2(&n, wpre, &incx);
-			if (wnorm<inner_tol)
-				break;
+			//daxpy(&n, &neg, w, &incx, wpre, &incx);
+			//wnorm=dnrm2(&n, wpre, &incx);
+			//if (wnorm<inner_tol)
+			//	break;
 
 	 	}
 		
@@ -426,16 +441,29 @@ void cabcd(	            int *rowidx,
 			// Compute residual based on previous subproblem solution
 			innerst = MPI_Wtime();
 			/////
-			while(1){
+			for(int in=0;in<Q;in++){
 	 			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
-                	n, 1, n, 1, recvG + i*n*n, n, w, 1, 0, zvec, 1);
-	 			daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, zvec, &incx);
+                	n, 1, n, 1, recvG + i*n*n, n, w, 1, 0, vec_tmp, 1);
+	 			daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, vec_tmp, &incx);
+
+				memset(vec, 0, sizeof(double)*n);
+	 			gama_n=(1+sqrt(gama_p*gama_p))/2.0;
+
+	 			double al1 = (gama_p-1.0)/gama_n;
+	 			double al2 = -(gama_p-1.0)/gama_n;
+
+	 			daxpy(&n, &al1 , w, &incx, vec, &incx);
+	 			daxpy(&n, &one , w, &incx, vec, &incx);  
+	 			daxpy(&n, &al2, wpre, &incx, vec, &incx); 	
 	 			for (int z = 0; z < n; ++z)
 				{
 					wpre[z]=w[z];
+					w[z]=vec[z];
 				}
 
-	 			daxpy(&n, &tk, zvec, &incx, w, &incx);
+	
+
+	 			daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
 				// do proximal:
 	 			for (int z = 0; z < n; ++z)
@@ -449,10 +477,10 @@ void cabcd(	            int *rowidx,
 				}
 
 				// if(norm(wpre-w)<tol) break;
-				daxpy(&n, &neg, w, &incx, wpre, &incx);
-				wnorm=dnrm2(&n, wpre, &incx);
-				if (wnorm<inner_tol)
-					break;
+				//daxpy(&n, &neg, w, &incx, wpre, &incx);
+				//wnorm=dnrm2(&n, wpre, &incx);
+				//if (wnorm<inner_tol)
+				//	break;
 
 	 		}
 				
@@ -514,9 +542,12 @@ void cabcd(	            int *rowidx,
 			}
 
 		}
-		/*
-		 * End Inner s-step loop
+		
+		//}
+/*
 		*/
+		 
+		
 
 		/* !!Commenting out heuristic residual convergence test!!
 		
@@ -625,7 +656,7 @@ int main (int argc, char* argv[])
 		if(rank == 0)
 		{
 			std::cout << "Bad args list!" << std::endl;
-			std::cout << argv[0] << " [filename] [rows] [cols] [lambda] [maxit] [tol] [seed] [freq] [block size] [loop block size] [number of benchmark iterations] [nnz] [frequency of residual computation] [wop file] [tk]" << std::endl;
+			std::cout << argv[0] << " [filename] [nrows] [ncols] [lambda] [maxit] [tol] [seed] [freq] [percent] [k] [number of benchmark iterations] [nnz]  [wop file] [step size]" << std::endl;
 		}
 
 		MPI_Finalize();
@@ -645,8 +676,9 @@ int main (int argc, char* argv[])
 	s = atoi(argv[10]);
 	int niter = atoi(argv[11]);
 	int nnz=atoi(argv[12]);
-	fnamewop = argv[14];
-	double tk = atof(argv[15]);
+	fnamewop = argv[13];
+	double tk = atof(argv[14]);
+	int Qinput=atoi(argv[15]);
 	//std::string lines = libsvmread(fname, m, n);
 
 	//vector<int> rowidx, colidx;
@@ -674,7 +706,7 @@ int main (int argc, char* argv[])
 		{
 			wopfile>>wop[i];
 		}
-	//cout<<"nnz:"<<rowidx[m]<<endl;	
+//	cout<<"nnz:"<<rank;	
 //cout<<"LLLLL"<<endl;
 	// Load balancing and finding the indexed for scattering:
 	int k=1;
@@ -794,14 +826,7 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 			std::cout << "Finished Scatter of X and y in " << scatterstp - scatterst << " seconds." << std::endl;
 			//free(X); free(y);
 		}
-	}/*
-	else{
-		srand48(seed+rank);
-		for(int i = 0; i < cnts[rank]; ++i)
-			localX[i] = drand48();
-		for(int i = 0; i < cnts2[rank]; ++i)
-			localy[i] = drand48();
-	}*/
+	}
 		
 
 		int offset=local_rowidx[0]-1;
@@ -813,33 +838,8 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 	double *w;
 	w = (double*) malloc (n*sizeof(double));
 	//assert(0==Malloc_aligned(double, w, n, ALIGN));
-
-	/*
-	if(rank == 0){
-	for(int i = 0; i < npes; ++i)
-		std::cout << "cnts2[" << i << "] = " << cnts2[i];
-	std::cout << std::endl;
-	for(int i = 0; i < npes; ++i)
-		std::cout << "cnts[" << i << "] = " << cnts[i];
-	std::cout << std::endl;
-	for(int i = 0; i < npes; ++i)
-		std::cout << "displs2[" << i << "] = " << displs2[i];
-	std::cout << std::endl;
-	}
-	*/
 	MPI_Barrier(MPI_COMM_WORLD);
-	/*if(rank == 0)
-		std::cout << "Starting warm-up call" << std::endl;
-	cabcd(rowidx, colidx, vals, m, n, y, y.size(), lambda, s, b, maxit, tol, seed, freq, w, comm);
-	if(rank == 0){
-		std::cout << "w = ";
-		for(int i = 0; i < n; ++i)
-			std::cout << std::setprecision(16) << std::fixed << w[i] << " ";
-		std::cout << std::endl;
-	}*/
-
-	s = 1;
-	//b=0.1;
+	
 	int Kmax=4;
 	int Jmax=6;
 	double *results;
@@ -857,13 +857,13 @@ local_y= (double *)malloc(y_counts[rank]*sizeof(double));
 			//cabcd(rowidx, colidx, vals, m, n, y, y.size(), lambda, s, b, maxit, tol, seed, freq, w, comm);
 			algst = MPI_Wtime();
 			for(int i = 0; i < niter; ++i){
-				cabcd(local_rowidx, local_colidx, local_val, m, n, local_y,y_counts[rank],lambda, s, b, maxit, tol, seed, freq, w, comm,wop,tk);
+				cabcd(local_rowidx, local_colidx, local_val, m, n, local_y,y_counts[rank],lambda, s, b, maxit, tol, seed, freq, w, comm,wop,tk,Qinput);
 				//write_to_file(w, n);
 				//cabcd(rowidx, colidx, vals, m, n, y, y.size(), lambda, s, b, maxit, tol, seed, freq, w, comm);
 				//cabcd(rowidx, colidx, vals, m, n, y, m, lambda, s, b, maxit, tol, seed, freq, w, comm);
 
 
-			seed++;
+	//		seed++;
 			}
 	//		cout<<"H1"<<endl;			
 			algstp = MPI_Wtime();
