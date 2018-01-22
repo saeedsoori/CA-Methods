@@ -333,9 +333,9 @@ void cabcd(	            int *rowidx,
 		*/
 		// X'X*w-X*y or gradient is stored in recvG + s*n*(n+1)
 	 	for(int in=0;in<Q;in++){
-	 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+	 		/*cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
                 n, 1, n, 1, recvG, n, w, 1, 0, vec_tmp, 1);
-	 		daxpy(&n, &neg, recvG + s*n*n, &incx, vec_tmp, &incx);
+	 		daxpy(&n, &neg, recvG + s*n*n, &incx, vec_tmp, &incx);*/
 
 			memset(vec, 0, sizeof(double)*n);
 			gama_n=(1+sqrt(1+4*gama_p*gama_p))/2.0;
@@ -353,6 +353,13 @@ void cabcd(	            int *rowidx,
 				w[z]=vec[z];
 			}
 			gama_p=gama_n;
+
+			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                			n, 1, n, 1, recvG, n, w, 1, 0, vec_tmp, 1);
+                        daxpy(&n, &neg, recvG + s*n*n, &incx, vec_tmp, &incx);
+
+                       // memset(vec, 0, sizeof(double)*n);
+                       // gama_n=(1+sqrt(1+4*gama_p*gama_p))/2.0;
 	 		daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
 			// do proximal:
@@ -444,9 +451,9 @@ void cabcd(	            int *rowidx,
 			innerst = MPI_Wtime();
 			/////
 			for(int in=0;in<Q;in++){
-	 			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+	 /*			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
                 	n, 1, n, 1, recvG + i*n*n, n, w, 1, 0, vec_tmp, 1);
-	 			daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, vec_tmp, &incx);
+	 			daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, vec_tmp, &incx);*/
 
 				memset(vec, 0, sizeof(double)*n);
 				gama_n=(1+sqrt(1+4*gama_p*gama_p))/2.0;	 
@@ -464,7 +471,11 @@ void cabcd(	            int *rowidx,
 				}
 
 				gama_p=gama_n;
-
+				
+				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 
+                        n, 1, n, 1, recvG + i*n*n, n, w, 1, 0, vec_tmp, 1);
+                                daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, vec_tmp, &incx);
+				
 	 			daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
 				// do proximal:
