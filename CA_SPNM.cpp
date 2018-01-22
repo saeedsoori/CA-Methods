@@ -159,7 +159,7 @@ void cabcd(	            int *rowidx,
 	int len=b;
 	double *alpha, *res,  *obj_err, *sol_err;
 	double *del_w;
-	double *wpre,*vec_tmp;
+	double *wpre,*vec_tmp,*vec;
 	double ctol;
 	double *G, *recvG, *Xsamp, *wsamp, *sampres, *sampres_sum;
 	int incx = 1;
@@ -178,6 +178,7 @@ void cabcd(	            int *rowidx,
 	del_w = (double*) malloc (s*n*sizeof(double));
 	wsamp = (double*) malloc (n*sizeof(double));
 	wpre  = (double*) malloc (n*sizeof(double));
+	vec  = (double*) malloc (n*sizeof(double));
 	vec_tmp  = (double*) malloc (n*sizeof(double));
 	index = (int*) malloc (b*sizeof(int));
 	sampres = (double*) malloc (n*sizeof(double));
@@ -337,11 +338,12 @@ void cabcd(	            int *rowidx,
 	 		daxpy(&n, &neg, recvG + s*n*n, &incx, vec_tmp, &incx);
 
 			memset(vec, 0, sizeof(double)*n);
-	 		gama_n=(1+sqrt(gama_p*gama_p))/2.0;
+			gama_n=(1+sqrt(1+4*gama_p*gama_p))/2.0;
 
 	 		double al1 = (gama_p-1.0)/gama_n;
-	 		double al2 = -(gama_p-1.0)/gama_n;
-
+			double al2 = -(gama_p-1.0)/gama_n;
+		//	double al1=(iter-2)/(iter+1);
+		 //	double al2=-(iter-2)/(iter+1);
 	 		daxpy(&n, &al1 , w, &incx, vec, &incx);
 	 		daxpy(&n, &one , w, &incx, vec, &incx);  
 	 		daxpy(&n, &al2, wpre, &incx, vec, &incx); 	
@@ -350,7 +352,7 @@ void cabcd(	            int *rowidx,
 				wpre[z]=w[z];
 				w[z]=vec[z];
 			}
-
+			gama_p=gama_n;
 	 		daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
 			// do proximal:
@@ -447,11 +449,11 @@ void cabcd(	            int *rowidx,
 	 			daxpy(&n, &neg, recvG + s*n*n+i*n, &incx, vec_tmp, &incx);
 
 				memset(vec, 0, sizeof(double)*n);
-	 			gama_n=(1+sqrt(gama_p*gama_p))/2.0;
-
+				gama_n=(1+sqrt(1+4*gama_p*gama_p))/2.0;	 
 	 			double al1 = (gama_p-1.0)/gama_n;
 	 			double al2 = -(gama_p-1.0)/gama_n;
-
+	//			double al1=(iter-2)/(iter+1);
+	//		 	double al2=-(iter-2)/(iter+1);
 	 			daxpy(&n, &al1 , w, &incx, vec, &incx);
 	 			daxpy(&n, &one , w, &incx, vec, &incx);  
 	 			daxpy(&n, &al2, wpre, &incx, vec, &incx); 	
@@ -461,7 +463,7 @@ void cabcd(	            int *rowidx,
 					w[z]=vec[z];
 				}
 
-	
+				gama_p=gama_n;
 
 	 			daxpy(&n, &neg_tk, vec_tmp, &incx, w, &incx);
 
@@ -493,6 +495,9 @@ void cabcd(	            int *rowidx,
 				}
 				daxpy(&n, &neg, wop, &incx, wsamp, &incx);
 				resnrm=dnrm2(&n, wsamp, &incx)/dnrm2(&n, wop, &incx);
+	//			if(rank==0){
+//					cout<<resnrm<<endl;		
+//				}
 				if(resnrm <= tol){
 					free(alpha); free(G); free(recvG);
 					free(index); free(del_w); free(wsamp); free(sampres);
@@ -679,6 +684,27 @@ int main (int argc, char* argv[])
 	fnamewop = argv[13];
 	double tk = atof(argv[14]);
 	int Qinput=atoi(argv[15]);
+
+	if(rank==0){
+
+	cout<<"filename: "<<argv[1]<<endl;
+	cout<<"m: "<<argv[2]<<endl;
+        cout<<"n: "<<argv[3]<<endl;
+        cout<<"lambda: "<<argv[4]<<endl;
+        cout<<"maxit: "<<argv[5]<<endl;
+        cout<<"tol: "<<argv[6]<<endl;
+        cout<<"seed: "<<argv[7]<<endl;
+        cout<<"freq: "<<argv[8]<<endl;
+        cout<<"b: "<<argv[9]<<endl;
+	cout<<"s: "<<argv[10]<<endl;
+        cout<<"niter: "<<argv[11]<<endl;
+        cout<<"nnz: "<<argv[12]<<endl;
+        cout<<"fnamewop: "<<argv[13]<<endl;
+        cout<<"tk: "<<argv[14]<<endl;
+        cout<<"Qinput: "<<argv[15]<<endl;
+
+
+	}
 	//std::string lines = libsvmread(fname, m, n);
 
 	//vector<int> rowidx, colidx;
