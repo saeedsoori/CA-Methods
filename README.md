@@ -33,15 +33,15 @@ CASPNM accepts multiple parameters as input:
 mpirun -np [number of processors] [filepath] [nrows] [ncols] [lambda] [maxit] [freq] [sampling rate] [k] [number of benchmark iterations] [nnz] [initial step size] [Q] [beta]
 ```
 
-filepath: full path to the dataset
-nrows: number of samples in the dataset
-ncols: number of columns in the dataset
-lambda: regularization parameter
-iterations: number if iterations to run
-freq: frequency of computing objective function and printing the output. If you are running the program for many iterations, it is better to set this to higher values like 10, 100 or more depending on iterations.
-sampling rate: for stochastic gradient descent
-nnz: number of non-zeros in the dataset
-k, Q , beta: method parameters
+- filepath: full path to the dataset
+- nrows: number of samples in the dataset
+- ncols: number of columns in the dataset
+- lambda: regularization parameter
+- iterations: number if iterations to run
+- freq: frequency of computing the objective function value. 
+- sampling rate: for stochastic gradient descent
+- nnz: number of non-zeros in the dataset
+- k, Q , beta: method parameters
 
 A simple bash file is provided that can run mnist on 2 processors. In order to run, mnist dataset has to be split in two and put in a directory called dataset next to the code. Therefore,  dataset folder should contain mnist, mnist-0 and mnist-1 which are respectively the main dataset, the first split and the second split. You can find in the `scripts` directoy the required bash files. In order run:
 
